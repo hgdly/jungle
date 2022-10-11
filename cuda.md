@@ -334,7 +334,7 @@ void kernel(…)
 }
 ```
 
-Le kernel doit copié les données depuis la mémoire globale sur la mémoire partagée.
+Le kernel doit copier les données depuis la mémoire globale sur la mémoire partagée.
 
 ```c
 #define SIZE 1024
@@ -362,7 +362,7 @@ void kernel(float *data)
 
 Les pointeurs peuvent seulement pointer vers une zone allouées/déclarées dans la mémoire globale.
 
-- Zone alloué par le host, le pointeur est passé en paramètre du kernel : `__global__ void kernel(float *prt){}`
+- Zone allouée par le host, le pointeur est passé en paramètre du kernel : `__global__ void kernel(float *prt){}`
 - Pointeur calculé comme l'adresse d'une variable globale : `float *ptr = &globalVar;`
 
 ### Exemple : DNA pattern matching
@@ -489,7 +489,34 @@ void search(unsigned char *d_seq, bool *d_match)
 
 ### Tuiles
 
-Il s'agit d'une stratégie pour réduire le trafic vers la mémoire globale.
+Il s'agit d'une stratégie pour réduire le trafic vers la mémoire globale.  
+Pour limiter les accès à la mémoire globale, il faut découper les données et les placer dans des mémoires partagées.
+
+Exemple:
+
+```c
+__global__ 
+void MatmulKernel(float *A, float *B, float *C, int N)
+{
+  __shared__ float AS[BSIZE][BSIZE];
+  __shared__ float BS[BSIZE][BSIZE];
+  int row = blockIdx.y * BSIZE + threadIdx.y;
+  int col= blockIdx.x * BSIZE + threadIdx.x;
+  float res = 0;
+  for (int ph=0 ; ph<(N/BSIZE); ph++)
+  {
+    AS[threadIdx.y][threadIdx.x] = A[row * N + ph * BSIZE + threadIdx.x];
+    BS[threadIdx.y][threadIdx.x] = B[[(ph* BSIZE + threadIdx.y) * N + col];
+    _syncthreads();
+    for (int k=0; k<BSIZE; k++)
+    {
+      res += AS[threadIdx.y][k] * BS[k][threadIdx.x];
+    }
+    __syncthreads();
+  }
+  C[row*N + col] = res;
+}
+```
 
 ## Algorithmes spécifiques au GPU
 
