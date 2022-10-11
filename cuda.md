@@ -1,3 +1,11 @@
+<!-- 
+  cuda.md
+  Cuda
+  Hugo D.
+  Created : 10 octobre 2022
+  Updated : 11 octobre 2022
+-->
+
 # Cuda
 
 - [Cuda](#cuda)
@@ -19,6 +27,20 @@
       - [Optimisation](#optimisation)
       - [Synchronisation](#synchronisation)
   - [Mémoires du GPU](#mémoires-du-gpu)
+    - [Registres](#registres)
+    - [Mémoire globale](#mémoire-globale)
+      - [Mémoire locale](#mémoire-locale)
+    - [Mémoire constante](#mémoire-constante)
+    - [Mémoire partagée](#mémoire-partagée)
+    - [Qualificateurs de variables](#qualificateurs-de-variables)
+    - [Exemple : DNA pattern matching](#exemple--dna-pattern-matching)
+      - [Version 1](#version-1)
+      - [Version 2 - Utilisation de la mémoire constante](#version-2---utilisation-de-la-mémoire-constante)
+      - [Version 3 - Utilisation de la mémoire partagée](#version-3---utilisation-de-la-mémoire-partagée)
+    - [Tuiles](#tuiles)
+  - [Algorithmes spécifiques au GPU](#algorithmes-spécifiques-au-gpu)
+    - [Opération de Scan](#opération-de-scan)
+      - [Exemple de scan](#exemple-de-scan)
 
 ## Motivation
 
@@ -128,33 +150,35 @@ Index du thread 2 du bloc 1: `blockIdx.x (1) * blockDim.x (256) + threadIdx.x (2
 
 #### Exemple
 
-    void rgb2grey(uchar4 *hcimg, uchar *hgimg, int isize) 
-    {
-      int bsize = 256;
-      int gsize = ((isize + bsize -1) /bsize);
-      int numc = isize*sizeof(uchar4);
-      int numg = isize*sizeof(unsigned char);
-      uchar4 *dcimg;
-      unsigned char *dgimg;
-      cudaMalloc((void **)&dcimg, numc);
-      cudaMemcpy(dcimg, hcimg, numc, cudaMemcpyHostToDevice);
-      cudaMalloc((void **)&gdimg, numg);
-      color2grey<<< gsize, bsize >>>(dcimg, dgimg, isize);
-      cudaMemcpy(hgimg, dgimg, numg, cudaMemcpyDeviceToHost);
-      cudaFree(dcimg); cudaFree(dgimg);
-    }
+```c
+void rgb2grey(uchar4 *hcimg, uchar *hgimg, int isize) 
+{
+  int bsize = 256;
+  int gsize = ((isize + bsize -1) /bsize);
+  int numc = isize*sizeof(uchar4);
+  int numg = isize*sizeof(unsigned char);
+  uchar4 *dcimg;
+  unsigned char *dgimg;
+  cudaMalloc((void **)&dcimg, numc);
+  cudaMemcpy(dcimg, hcimg, numc, cudaMemcpyHostToDevice);
+  cudaMalloc((void **)&gdimg, numg);
+  color2grey<<< gsize, bsize >>>(dcimg, dgimg, isize);
+  cudaMemcpy(hgimg, dgimg, numg, cudaMemcpyDeviceToHost);
+  cudaFree(dcimg); cudaFree(dgimg);
+}
 
-    __global__
-    void color2grey(uchar4 *dcimg, uchar *dgimg, int isize)
-    {
-      int index = blockIdx.x * blockDim.x + threadIdx.x;
-      uchar4 p;
-      if (index < isize)
-      {
-        p = dcimg[index];
-        dgimg[index] = (299*p.x + 587*p.y + 114*p.z) / 1000;
-      }
-    }
+__global__
+void color2grey(uchar4 *dcimg, uchar *dgimg, int isize)
+{
+  int index = blockIdx.x * blockDim.x + threadIdx.x;
+  uchar4 p;
+  if (index < isize)
+  {
+    p = dcimg[index];
+    dgimg[index] = (299*p.x + 587*p.y + 114*p.z) / 1000;
+  }
+}
+```
 
 #### Limites
 
@@ -166,36 +190,38 @@ Le nombre de threads par bloc est limité à 1024.
 
 Exemple :
 
-    #define BSIZE 16
-    void matmul(float *A, float *B, float *C, int N)
-    {
-      int bytes = N*N*sizeof(float);
-      int numb = N / BSIZE;
-      if (N % BSIZE != 0) numb++;
-      dim3 gsize(numb, numb, 1);
-      dim3 bsize(BSIZE , BSIZE , 1);
-      float *dA, *dB,*dC;
-      cudaMalloc((void **)&dA, bytes);
-      cudaMalloc((void **)&dB, bytes);
-      cudaMalloc((void **)&dC,bytes);
-      cudaMemcpy(dA, A, bytes, cudaMemcpyHostToDevice);
-      cudaMemcpy(dB, B, bytes, cudaMemcpyHostToDevice);
-      matmulkernel<<<gsize,bsize>>>(dA,dB,dC,N);
-      cudaMemcpy(C, dC, bytes, cudaMemcpyDeviceToHost);
-      cudaFree(dA); cudaFree(dB); cudaFree(dC);
-    }
-    __global__
-    void matmulkernel(float *dA, float *dB, float *dC, int N)
-    {
-      int row = blockIdx.y * blockDim.y + threadIdx.y;
-      int col = blockIdx.x * blockDim.x + threadIdx.x;
-      if ((row<N) && (col<N)){
-        float res = 0;
-        for (int k=0; k<N ; k++)
-        res += dA[row*N+k] * dB[k*N+col];
-        dC[row*N + col] = res;
-      }
-    }
+```c
+#define BSIZE 16
+void matmul(float *A, float *B, float *C, int N)
+{
+  int bytes = N*N*sizeof(float);
+  int numb = N / BSIZE;
+  if (N % BSIZE != 0) numb++;
+  dim3 gsize(numb, numb, 1);
+  dim3 bsize(BSIZE , BSIZE , 1);
+  float *dA, *dB,*dC;
+  cudaMalloc((void **)&dA, bytes);
+  cudaMalloc((void **)&dB, bytes);
+  cudaMalloc((void **)&dC,bytes);
+  cudaMemcpy(dA, A, bytes, cudaMemcpyHostToDevice);
+  cudaMemcpy(dB, B, bytes, cudaMemcpyHostToDevice);
+  matmulkernel<<<gsize,bsize>>>(dA,dB,dC,N);
+  cudaMemcpy(C, dC, bytes, cudaMemcpyDeviceToHost);
+  cudaFree(dA); cudaFree(dB); cudaFree(dC);
+}
+__global__
+void matmulkernel(float *dA, float *dB, float *dC, int N)
+{
+  int row = blockIdx.y * blockDim.y + threadIdx.y;
+  int col = blockIdx.x * blockDim.x + threadIdx.x;
+  if ((row<N) && (col<N)){
+    float res = 0;
+    for (int k=0; k<N ; k++)
+    res += dA[row*N+k] * dB[k*N+col];
+    dC[row*N + col] = res;
+  }
+}
+```
 
 ## Modèle d'exécution
 
@@ -230,4 +256,276 @@ On préfèrera également un grand nombre de threads par bloc pour garantir un g
 
 ## Mémoires du GPU
 
+### Registres
+
 `idx` and `f`: variables privées des threads.
+
+### Mémoire globale
+
+CPU : lecture et écriture  
+Threads du GPU : lecture et écriture
+
+#### Mémoire locale
+
+C'est une zone spécifique dans la mémoire globale (longue latence).  
+Variable privées (arrays) mais ne peuvent pas être stockées dans les registres.
+
+### Mémoire constante
+
+CPU : lecture et écriture  
+Threads du GPU : lecture  
+La lecture seule réduit la latence
+
+Tous les threads d'un warp accèdent à la même adresse simultanément => un seul accès. L'accès est plus rapide que pour la mémoire gloable.
+
+Exemple
+
+```c
+#define SIZE 100
+
+float h_val[SIZE] = { … };
+__constant__ float d_val[SIZE];
+cudaMemcpyToSymbol(d_val, h_val,SIZE*sizeof(float));
+kernel<<<…,…>>>(…);
+
+__global__ 
+kernel(…)
+{
+  …
+  for (int i=0; i<SIZE; i++)
+    … = d_val[i] …;
+}
+```
+
+### Mémoire partagée
+
+Mémoire scratchpad sur puce => courte latence et taille limitée.  
+Partagée par tous les threads d'un même bloc. L'allocation peut être statique ou dynamique.
+
+Allocation statique:
+
+```c
+#define SIZE 1024
+
+__global__ 
+void kernel(…) 
+{
+  __shared__ float shared_data[SIZE];
+  …
+}
+```
+
+Allocation dynamique:
+
+```c
+#define SIZE 1024
+
+int main()
+{
+  …
+  kernel<<<…, …, SIZE*sizeof(float)>>>(…);
+}
+
+__global__ 
+void kernel(…) 
+{
+  extern __shared__ float *shared_data;
+  …
+}
+```
+
+Le kernel doit copié les données depuis la mémoire globale sur la mémoire partagée.
+
+```c
+#define SIZE 1024
+
+__global__ 
+void kernel(float *data) 
+{
+  __shared__ float shared_data[SIZE];
+  int idx = threadIdx.x;
+  shared_data[idx] = data[idx];
+  __syncthreads();
+  … // data can be accessed in the fast shared memory
+}
+```
+
+### Qualificateurs de variables
+
+|Déclaration|Mémoire|Portée|Durée de vie|
+|-:|-|-|-|
+|`int var`|registre|thread|kernel|
+|`int var[100]`|local|thread|kernel|
+|`__device__ __shared__ int var`|shared|bloc|kernel|
+|`__device__ int var`|global|grid|application|
+|`__device__ __constant__ int var`|constant|grid|application|
+
+Les pointeurs peuvent seulement pointer vers une zone allouées/déclarées dans la mémoire globale.
+
+- Zone alloué par le host, le pointeur est passé en paramètre du kernel : `__global__ void kernel(float *prt){}`
+- Pointeur calculé comme l'adresse d'une variable globale : `float *ptr = &globalVar;`
+
+### Exemple : DNA pattern matching
+
+#### Version 1
+
+```c
+#define SLEN 16384
+#define PLEN 8
+#define BSIZE 512
+
+bool matches(unsigned char *pattern, unsigned char *seq)
+{
+  unsigned int bnum = (SLEN – PLEN + 1 + BSIZE-1)/BSIZE) ;
+  unsigned int pbytes = PLEN*sizeof(char);
+  unsigned int sbytes = SLEN*sizeof(char);
+  bool h_match = FALSE; bool *d_match;
+  unsigned char *d_seq, *d_pattern;
+  cudaMalloc((void **)&d_seq, sbytes);
+  cudaMemcpy(d_seq, seq, sbytes, CudaMemcpyHostToDevice);
+  cudaMalloc((void **)&d_pattern, pbytes);
+  cudaMemcpy(d_pattern, pattern, pbytes, CudaMemcpyHostToDevice);
+  cudaMalloc((void **)&d_match, sizeof(bool));
+  cudaMemcpy(d_match, &h_match, sizeof(bool), CudaMemcpyHostToDevice);
+  search<<<bnum, BSIZE>>>(d_seq, d_pattern, d_match);
+  cudaMemcpy(h_match, d_match, sizeof(bool), CudaMemcpyDeviceToHost);
+  cudaFree(d_seq); cudaFree(d_pattern); cudaFree(d_match);
+  return(h_match);
+} 
+```
+
+```c
+__global__
+void search( unsigned char *d_seq, unsigned char *d_pattern,
+bool *d_match)
+{
+  int gidx = blockIdx.x*blockDim.x+threadIdx.x;
+  bool found = TRUE;
+  if (idx < SLEN – PLEN + 1)
+  {
+    for (int i=0; i<PLEN; i++)
+    if (d_seq[gidx+i] != d_pattern[i])
+    found = FALSE;
+    if (found)
+    *d_match = TRUE;
+  }
+} 
+```
+
+#### Version 2 - Utilisation de la mémoire constante
+
+```c
+#define SLEN 16384
+#define PLEN 8
+#define BSIZE 512
+
+bool matches(unsigned char *pattern, unsigned char *seq)
+{
+  unsigned int bnum = (SLEN – PLEN + 1 + BSIZE-1)/BSIZE) ;
+  unsigned int pbytes = PLEN*sizeof(char);
+  unsigned int sbytes = SLEN*sizeof(char);
+  bool h_match = FALSE; bool *d_match;
+  unsigned char *d_seq, *d_pattern;
+
+  cudaMalloc((void **)&d_seq, sbytes);
+  cudaMemcpy(d_seq, seq, sbytes, CudaMemcpyHostToDevice);
+  __constant__ unsigned char c_pattern[PLEN];
+  cudaMemcpyToSymbol(c_pattern, pattern, pbytes);
+  cudaMalloc((void **)&d_match, sizeof(bool));
+  cudaMemcpy(d_match, &h_match, sizeof(bool), CudaMemcpyHostToDevice);
+
+  search<<<bnum, BSIZE>>>(d_seq, d_match);
+
+  cudaMemcpy(h_match, d_match, sizeof(bool), CudaMemcpyDeviceToHost);
+
+  cudaFree(d_seq); cudaFree(d_pattern); cudaFree(d_match);
+
+  return(h_match);
+} 
+```
+
+```c
+__global__
+void search( unsigned char *d_seq, unsigned char *d_pattern,
+bool *d_match)
+{
+  int gidx = blockIdx.x*blockDim.x+threadIdx.x;
+  bool found = TRUE;
+  if (gidx < SLEN – PLEN + 1)
+  {
+    for (int i=0; i<PLEN; i++)
+    if (d_seq[gidx+i] != c_pattern[i])
+    found = FALSE;
+    if (found)
+    *d_match = TRUE;
+  }
+} 
+```
+
+#### Version 3 - Utilisation de la mémoire partagée
+
+```c
+__global__
+void search(unsigned char *d_seq, bool *d_match)
+{
+  int gidx = blockIdx.x*blockDim.x+threadIdx.x;
+  bool found = TRUE;
+  __shared__ unsigned char sh_seq[BSIZE+PLEN–1];
+  int lidx = threadIdx.x;
+  sh_seq[lidx] = d_seq[gidx];
+  if ( (lidx < PLEN– 1) && (gidx + BSIZE < SLEN) )
+  sh_seq[lidx+BSIZE] = seq[gidx+BSIZE];
+  __synchthreads();
+  if (gidx < SLEN – PLEN + 1)
+  {
+    for (int i=0; i<PLEN; i++)
+    if (sh_seq[lidx+i] != c_pattern[i])
+    found = FALSE;
+    if (found)
+    *d_match = TRUE;
+  }
+}
+```
+
+### Tuiles
+
+Il s'agit d'une stratégie pour réduire le trafic vers la mémoire globale.
+
+## Algorithmes spécifiques au GPU
+
+### Opération de Scan
+
+Définition:
+
+- Une liste en entrée
+- Un opérateur binaire associatif
+- Un élément identité `[I op a = a]`
+
+Inclusif:
+
+```c
+int acc = id_element;
+for (i=0 ; i<n; i++) {
+  acc = acc op in[i];
+  out[i] = acc;
+}
+```
+
+Exclusif:
+
+```c
+int acc = id_element;
+for (i=0 ; i<n; i++) {
+  acc = acc op in[i];
+  out[i] = acc;
+}
+```
+
+#### Exemple de scan
+
+- Entrée : `[1 2 3 4 5 6 7 8]`
+- Opérateur: +
+- Élément identité: 0
+
+- Sortie scan insclusif: `[1 3 6 10 15 21 28 36]`
+- Sortie scan exclusif: `[0 1 3 6 10 15 21 28]`
