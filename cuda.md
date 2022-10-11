@@ -516,8 +516,8 @@ Exclusif:
 ```c
 int acc = id_element;
 for (i=0 ; i<n; i++) {
-  acc = acc op in[i];
   out[i] = acc;
+  acc = acc op in[i];
 }
 ```
 
