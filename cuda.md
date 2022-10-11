@@ -12,7 +12,13 @@
       - [Déclaration de fonction](#déclaration-de-fonction)
       - [Appel de fonction](#appel-de-fonction)
       - [Exemple](#exemple)
+      - [Limites](#limites)
     - [Parallélisme à 3 dimensions](#parallélisme-à-3-dimensions)
+  - [Modèle d'exécution](#modèle-dexécution)
+    - [Warps](#warps)
+      - [Optimisation](#optimisation)
+      - [Synchronisation](#synchronisation)
+  - [Mémoires du GPU](#mémoires-du-gpu)
 
 ## Motivation
 
@@ -95,14 +101,9 @@ Code du GPU (kernel)
 - `y`: nombre de threads par bloc
 - `x, y`: nombre de threads
 
-`idx` and `f`: variables privées des threads
-
-`threadIdx.x`: identificateur du thread
-
-`blockIdx.x`: identificateur du bloc
-
-`blockDim.x`: dimension du bloc ou nombre de threads dans un bloc
-
+`threadIdx.x`: identificateur du thread  
+`blockIdx.x`: identificateur du bloc  
+`blockDim.x`: dimension du bloc ou nombre de threads dans un bloc  
 `gridDim.x`: nombre de blocs
 
 Exemple de calcul d'index:
@@ -133,14 +134,14 @@ Index du thread 2 du bloc 1: `blockIdx.x (1) * blockDim.x (256) + threadIdx.x (2
       int gsize = ((isize + bsize -1) /bsize);
       int numc = isize*sizeof(uchar4);
       int numg = isize*sizeof(unsigned char);
-      uchar4* dcimg;
+      uchar4 *dcimg;
       unsigned char *dgimg;
       cudaMalloc((void **)&dcimg, numc);
       cudaMemcpy(dcimg, hcimg, numc, cudaMemcpyHostToDevice);
-      cudaMalloc((void **)&gdimg, numg) ;
-      color2grey<<< gsize, bsize >>>(dcimg , dgimg , isize);
+      cudaMalloc((void **)&gdimg, numg);
+      color2grey<<< gsize, bsize >>>(dcimg, dgimg, isize);
       cudaMemcpy(hgimg, dgimg, numg, cudaMemcpyDeviceToHost);
-      cudaFree(dcimg) ; cudaFree(dgimg) ;
+      cudaFree(dcimg); cudaFree(dgimg);
     }
 
     __global__
@@ -155,4 +156,78 @@ Index du thread 2 du bloc 1: `blockIdx.x (1) * blockDim.x (256) + threadIdx.x (2
       }
     }
 
+#### Limites
+
+`gridDim.x` (`.y`, `.z`) doit être compris entre 1 et 65536.
+
+Le nombre de threads par bloc est limité à 1024.
+
 ### Parallélisme à 3 dimensions
+
+Exemple :
+
+    #define BSIZE 16
+    void matmul(float *A, float *B, float *C, int N)
+    {
+      int bytes = N*N*sizeof(float);
+      int numb = N / BSIZE;
+      if (N % BSIZE != 0) numb++;
+      dim3 gsize(numb, numb, 1);
+      dim3 bsize(BSIZE , BSIZE , 1);
+      float *dA, *dB,*dC;
+      cudaMalloc((void **)&dA, bytes);
+      cudaMalloc((void **)&dB, bytes);
+      cudaMalloc((void **)&dC,bytes);
+      cudaMemcpy(dA, A, bytes, cudaMemcpyHostToDevice);
+      cudaMemcpy(dB, B, bytes, cudaMemcpyHostToDevice);
+      matmulkernel<<<gsize,bsize>>>(dA,dB,dC,N);
+      cudaMemcpy(C, dC, bytes, cudaMemcpyDeviceToHost);
+      cudaFree(dA); cudaFree(dB); cudaFree(dC);
+    }
+    __global__
+    void matmulkernel(float *dA, float *dB, float *dC, int N)
+    {
+      int row = blockIdx.y * blockDim.y + threadIdx.y;
+      int col = blockIdx.x * blockDim.x + threadIdx.x;
+      if ((row<N) && (col<N)){
+        float res = 0;
+        for (int k=0; k<N ; k++)
+        res += dA[row*N+k] * dB[k*N+col];
+        dC[row*N + col] = res;
+      }
+    }
+
+## Modèle d'exécution
+
+SM: Streaming Multiprocessor  
+SP: Streaming Processor
+
+Un bloc est affecté à un seul SM.  
+Plusieurs blocs sur un même SM.  
+Moins de 1536 threads par SM.  
+
+### Warps
+
+Un bloc est divisé en warps de 32 threads.  
+32 threads avec des nombres consécutifs (0-31, 32-63, ...).  
+
+Quand une instruction n'est pas prête à être exécutée ou a un long temps de latence, un autre warp est programmé.
+
+#### Optimisation
+
+On préfèrera une taille de bloc qui remplis des warps entiers (multiple de 32).  
+Exemple :
+
+- `kernel<<<N, 1>>>(...)`
+- `kernel<<<N/32, 32>>>(...)`
+- `kernel<<<N/128, 128>>>(...)`
+
+On préfèrera également un grand nombre de threads par bloc pour garantir un grand nombre de warps sur le même SM. C'est ainsi que le GPU peut cacher de longues latences et afficher un débit d'instructions élevé.
+
+#### Synchronisation
+
+`__syncthreads()` agit comme une barrière. Créer un "barrage" et attend tous les threads du même bloc.
+
+## Mémoires du GPU
+
+`idx` and `f`: variables privées des threads.
