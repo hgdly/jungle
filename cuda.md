@@ -1,9 +1,9 @@
 <!-- 
-  cuda.md
-  Cuda
-  Hugo D.
-  Created : 10 octobre 2022
-  Updated : 11 octobre 2022
+  F cuda.md
+  T Cuda
+  A Hugo D.
+  C 10 octobre 2022
+  U 11 octobre 2022
 -->
 
 # Cuda <!-- omit in toc -->
@@ -134,16 +134,19 @@ Exemple de calcul d'index:
 - x = N / y = 1024
   
 bloc 0
+
 |0|1|2|...|255|
-|-|-|-|-|-|
+|:-:|:-:|:-:|:-:|:-:|
 
 bloc 1
+
 |0|1|2|...|255|
-|-|-|-|-|-|
+|:-:|:-:|:-:|:-:|:-:|
 
 ...bloc 1023
+
 |0|1|2|...|255|
-|-|-|-|-|-|
+|:-:|:-:|:-:|:-:|:-:|
 
 Index du thread 2 du bloc 1: `blockIdx.x (1) * blockDim.x (256) + threadIdx.x (2) = 258`
 
