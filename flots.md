@@ -40,8 +40,8 @@ D'autres problèmes se ramènent à des problèmes de flots :
 > - compatible (avec c) : $\varphi(x, y)\leqslant c(x,y), \forall(x,y)\in U$  
 > Si $\varphi(x,y) = c(x,y)$, alors l'arc est saturé
 > - vérifie la loi de Kirchhoff (conservation du flux) :  
-> $\forall x \in X - \{s,t\}: \sum_{y \in pred(x)}^{\varphi(y,x)}=\sum_{y \in succ(x)}^{\varphi(x,y)}$  
-> en s, t : $\sum_{y \in pred(t)}^{\varphi(y,t)}=\sum_{y \in succ(s)}^{\varphi(s,y)}$
+> $\forall x \in X - \{s,t\}: \sum_{y \in pred(x)}{\varphi(y,x)}=\sum_{y \in succ(x)}{\varphi(x,y)}$  
+> en s, t : $\sum_{y \in pred(t)}{\varphi(y,t)}=\sum_{y \in succ(s)}{\varphi(s,y)}$
 > - graphe avec arc de retour : $U \cup \{(t, s)\}$ avec c(t, s) = $+\infty$
-> - valeur de $\varphi$  : $v(\varphi)=  \varphi(t,s) = \sum_{y \in pred(t)}^{\varphi(y,t)}=\sum_{y \in succ(s)}^{\varphi(s,y)}$
+> - valeur de $\varphi$  : $v(\varphi)=  \varphi(t,s) = \sum_{y \in pred(t)}{\varphi(y,t)}=\sum_{y \in succ(s)}{\varphi(s,y)}$
 
