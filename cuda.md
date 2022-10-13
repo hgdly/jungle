@@ -1,9 +1,9 @@
 <!-- 
-  F cuda.md
-  T Cuda
-  A Hugo D.
-  C 10 octobre 2022
-  U 11 octobre 2022
+  cuda.md
+  Cuda
+  Hugo D.
+  Created : 10 octobre 2022
+  Updated : 11 octobre 2022
 -->
 
 # Cuda <!-- omit in toc -->
