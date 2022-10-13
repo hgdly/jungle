@@ -29,12 +29,14 @@ D'autres problèmes se ramènent à des problèmes de flots :
 ## Flots dans les réseaux de transport
 
 > Définition 1 : Réseau de transport (X, U), s, t, c.
+>
 > - Graphe orienté (X, U)
 > - 1 source s, 1 puit t
-> - capacité c : $U \rightarrow \R^+ \{+\infty\}$
+> - capacité c : $U \rightarrow \mathbb{R}^+ \{+\infty\}$
 
 > Définition 2 : Flot $\varphi$ sur le réseau de transport (X, U), s, t, c.
-> - $\varphi : U \rightarrow \R^+$. $\varphi(x, y)$ est le flux qui circule dans l'arc (x, y)
+>
+> - $\varphi : U \rightarrow \mathbb{R}^+$. $\varphi(x, y)$ est le flux qui circule dans l'arc (x, y)
 > - compatible (avec c) : $\varphi(x, y)\leqslant c(x,y), \forall(x,y)\in U$  
 > Si $\varphi(x,y) = c(x,y)$, alors l'arc est saturé
 > - vérifie la loi de Kirchhoff (conservation du flux) :  
